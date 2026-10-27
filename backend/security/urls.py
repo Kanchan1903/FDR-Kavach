@@ -1,0 +1,77 @@
+from django.urls import path
+
+from .case_views import CaseAlertListView, CaseAlertReadView, CaseDetailView, CaseListView, StaffDirectoryView
+from .fdr_views import (
+    FDRDetailView,
+    FDRDocumentConfirmView,
+    FDRDocumentDownloadView,
+    FDRDocumentExtractView,
+    FDRDocumentListCreateView,
+    FDRListCreateView,
+    FDRSubmitView,
+    FDRVersionListView,
+    InstitutionListCreateView,
+)
+from .phase45_views import (
+    CoverageRuleSetView,
+    CoverageTimelineView,
+    DashboardView,
+    FDRHistoryView,
+    LegacyImportView,
+    ReleaseRequestActionView,
+    ReleaseRequestListCreateView,
+    ReportExportView,
+)
+from .reconciliation_views import (
+    BankBatchListCreateView,
+    BankBatchResultsView,
+    DuplicateFindingsView,
+    ReconciliationResultListView,
+)
+from .views import (
+    AuditVerifyView,
+    CsrfView,
+    DemoTotpCodeView,
+    LoginView,
+    LogoutView,
+    MeView,
+    MfaEnrollView,
+    MfaVerifyView,
+)
+
+urlpatterns = [
+    path("csrf/", CsrfView.as_view()),
+    path("auth/login/", LoginView.as_view()),
+    path("auth/mfa/enroll/", MfaEnrollView.as_view()),
+    path("auth/mfa/verify/", MfaVerifyView.as_view()),
+    path("auth/logout/", LogoutView.as_view()),
+    path("auth/me/", MeView.as_view()),
+    path("auth/demo-totp/", DemoTotpCodeView.as_view()),
+    path("audit/verify/", AuditVerifyView.as_view()),
+    path("institutions/", InstitutionListCreateView.as_view()),
+    path("fdrs/", FDRListCreateView.as_view()),
+    path("fdrs/<uuid:pk>/", FDRDetailView.as_view()),
+    path("fdrs/<uuid:pk>/submit/", FDRSubmitView.as_view()),
+    path("fdrs/<uuid:pk>/versions/", FDRVersionListView.as_view()),
+    path("fdrs/<uuid:pk>/documents/", FDRDocumentListCreateView.as_view()),
+    path("fdrs/<uuid:pk>/documents/<uuid:document_id>/extract/", FDRDocumentExtractView.as_view()),
+    path("fdrs/<uuid:pk>/documents/<uuid:document_id>/confirm/", FDRDocumentConfirmView.as_view()),
+    path("fdrs/<uuid:pk>/documents/<uuid:document_id>/download/", FDRDocumentDownloadView.as_view()),
+    path("bank-batches/", BankBatchListCreateView.as_view()),
+    path("bank-batches/<uuid:pk>/results/", BankBatchResultsView.as_view()),
+    path("reconciliation/results/", ReconciliationResultListView.as_view()),
+    path("reconciliation/duplicates/", DuplicateFindingsView.as_view()),
+    path("cases/", CaseListView.as_view()),
+    path("cases/<uuid:pk>/", CaseDetailView.as_view()),
+    path("case-alerts/", CaseAlertListView.as_view()),
+    path("case-alerts/<uuid:pk>/read/", CaseAlertReadView.as_view()),
+    path("users/staff/", StaffDirectoryView.as_view()),
+    path("coverage/rules/", CoverageRuleSetView.as_view()),
+    path("coverage/timeline/", CoverageTimelineView.as_view()),
+    path("release-requests/", ReleaseRequestListCreateView.as_view()),
+    path("release-requests/<uuid:pk>/action/", ReleaseRequestActionView.as_view()),
+    path("fdrs/<uuid:pk>/history/", FDRHistoryView.as_view()),
+    path("dashboard/", DashboardView.as_view()),
+    path("reports/export/", ReportExportView.as_view()),
+    path("imports/legacy/", LegacyImportView.as_view()),
+]

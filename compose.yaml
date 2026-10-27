@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fdrkavach}
+      POSTGRES_USER: ${POSTGRES_USER:-fdrkavach}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fdrkavach} -d ${POSTGRES_DB:-fdrkavach}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7.4.1-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  api:
+    build: ./backend
+    command: sh -c "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://fdrkavach:change-me@db:5432/fdrkavach}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DJANGO_USE_REDIS_CACHE: "1"
+    ports: ["8000:8000"]
+    volumes: [documents_data:/app/media]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+  worker:
+    build: ./backend
+    command: celery -A config worker -l info
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://fdrkavach:change-me@db:5432/fdrkavach}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DJANGO_USE_REDIS_CACHE: "1"
+    depends_on: [api, redis]
+  beat:
+    build: ./backend
+    command: celery -A config beat -l info
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://fdrkavach:change-me@db:5432/fdrkavach}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DJANGO_USE_REDIS_CACHE: "1"
+    depends_on: [api, redis]
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_DEMO_MODE: ${DEMO_MODE:-false}
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+volumes:
+  postgres_data:
+  documents_data:

@@ -1,0 +1,48 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_DB: fdrkavach_test
+          POSTGRES_USER: fdrkavach
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fdrkavach -d fdrkavach_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DJANGO_SECRET_KEY: ci-test-only-secret-not-for-deployment
+      DJANGO_DEBUG: "1"
+      DATABASE_URL: postgresql://fdrkavach:test-password@localhost:5432/fdrkavach_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r backend/requirements.txt
+      - run: cd backend && coverage run --source=security.coverage,security.reconciliation,security.record_services manage.py test
+      - run: cd backend && coverage report --fail-under=85
+      - run: cd backend && ruff check .
+      - run: cd backend && bandit -r security config
+      - run: pip install pip-audit && pip-audit -r backend/requirements.txt
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm run build
+      - run: cd frontend && npm audit --audit-level=high
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2

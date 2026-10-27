@@ -60,18 +60,17 @@ This is a public demo deployment. Demo usernames and their shared password are i
 
 Render's web/worker services, Postgres, Key Value, and document disk in this blueprint use paid persistent plans. Render's free web services have ephemeral filesystems, free Postgres expires after 30 days, and free Key Value has no persistence; the worker services also need paid compute. Do not change this blueprint to free plans if you need a durable mentor demo or uploaded evidence to survive restarts. Review the current [Render free-instance limits](https://render.com/docs/free), [persistent disk requirements](https://render.com/docs/disks), and [Key Value persistence options](https://render.com/docs/key-value) before creating resources.
 
-1. In Render, create a Blueprint from `Kanchan1903/FDR-Kavach` on branch `main` and use the repository's `render.yaml`. Keep all services and datastores in the Singapore region. For the two frontend-origin prompts, enter the exact HTTPS Vercel production domain you plan to use, for example `https://fdr-kavach-demo.vercel.app`. Render generates the encryption and Django keys; do not replace them with the values from `.env.example`.
-2. Wait for the API's first successful deploy and initial demo seed. Check `https://<render-api-host>/healthz/` returns `{"status":"ok"}`. Record the actual Render API URL; it may differ from the service name if that subdomain is already taken.
-3. In Vercel, import the same GitHub repository, set **Root Directory** to `frontend`, and keep the Next.js framework and default build command. Add these Production environment variables before deployment:
+1. In Vercel, import the GitHub repository, set **Root Directory** to `frontend`, and keep the Next.js framework and default build command. To publish the frontend before deploying the API, set these Production environment variables:
 
    ```text
    NEXT_PUBLIC_API_URL=/backend
    NEXT_PUBLIC_DEMO_MODE=true
-   RENDER_API_ORIGIN=https://<actual-render-api-host>
    ```
 
-   `RENDER_API_ORIGIN` is server-side build configuration and must be the HTTPS Render API origin with no trailing slash. The Next.js rewrite proxies `/backend/api/*` to Render so session and CSRF cookies remain same-origin in the browser.
-4. Deploy Vercel. Copy its canonical production URL, then verify the Render Blueprint group's `FRONTEND_ORIGIN` and `DJANGO_CSRF_TRUSTED_ORIGINS` exactly match that URL (both are comma-separated lists if you add a custom domain). Redeploy the Render API after changing them. Add a custom domain only after both variables are updated to include it.
+   Deploy Vercel now to view the login page and interface. Without the API, authentication and live records are unavailable; login will report that the secure session could not be initialized.
+2. When ready to deploy the backend, create a Render Blueprint from `Kanchan1903/FDR-Kavach` on branch `main` using `render.yaml`. Keep all services and datastores in Singapore. Enter the exact HTTPS Vercel production origin for the frontend-origin prompts, for example `https://fdr-kavach-demo.vercel.app`. Render generates the encryption and Django keys; do not replace them with values from `.env.example`.
+3. Wait for the API's first successful deploy and initial demo seed. Check `https://<render-api-host>/healthz/` returns `{"status":"ok"}`. Record the actual Render API URL; it may differ from the service name if that subdomain is already taken.
+4. In Vercel Project Settings → Environment Variables, add `RENDER_API_ORIGIN=https://<actual-render-api-host>` for Production and redeploy. This server-side build setting enables the `/backend/api/*` proxy so session and CSRF cookies remain same-origin in the browser.
 5. Open the Vercel URL, use the login page's Demo Mode selector, then verify one institution account and one staff account including the TOTP helper. Confirm the demo banner is visible and the API and page work after a Render restart. Do not set `DJANGO_DEBUG=1` on Render.
 
 For a private, non-demo deployment, remove the public demo seed hook, set `DEMO_MODE=false` and `NEXT_PUBLIC_DEMO_MODE=false`, provision an administrator through a controlled Render shell/one-off job, and review `SECURITY.md` and provider access policies before entering any real information. This repository is a hackathon prototype, not an official AICTE service or a compliance approval.

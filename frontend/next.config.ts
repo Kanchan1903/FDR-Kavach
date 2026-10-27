@@ -1,12 +1,14 @@
 import type { NextConfig } from "next";
 const apiOrigin = process.env.RENDER_API_ORIGIN?.replace(/\/+$/, "");
-if (process.env.VERCEL && !apiOrigin?.startsWith("https://")) {
-  throw new Error("Set RENDER_API_ORIGIN to the HTTPS URL of the Render API service.");
+if (apiOrigin && !apiOrigin.startsWith("https://")) {
+  throw new Error("RENDER_API_ORIGIN must be an HTTPS URL when configured.");
 }
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async rewrites() {
+    // Allow the frontend to deploy before the API exists. Once the API is
+    // deployed, set RENDER_API_ORIGIN in Vercel and redeploy to enable proxying.
     return apiOrigin
       ? [{ source: "/backend/api/:path*", destination: `${apiOrigin}/api/:path*` }]
       : [];

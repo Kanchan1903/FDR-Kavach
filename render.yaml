@@ -8,13 +8,29 @@ services:
     dockerContext: ./backend
     healthCheckPath: /healthz/
     preDeployCommand: python manage.py migrate --noinput
-    startCommand: "sh -c 'python manage.py seed_demo && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 --access-logfile -'"
+    dockerCommand: >-
+      sh -c 'python manage.py seed_demo && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 --access-logfile -'
     disk:
       name: fdr-kavach-demo-documents
       mountPath: /app/media
       sizeGB: 1
     envVars:
       - fromGroup: fdr-kavach-demo-runtime
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fdr-kavach-demo-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: fdr-kavach-demo-redis
+          type: keyvalue
+          property: connectionString
+      - key: DJANGO_CSRF_TRUSTED_ORIGINS
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
 
   - type: worker
     name: fdr-kavach-demo-worker
@@ -23,9 +39,18 @@ services:
     plan: 0.5c-512mb
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    startCommand: celery -A config worker --loglevel=INFO
+    dockerCommand: celery -A config worker --loglevel=INFO
     envVars:
       - fromGroup: fdr-kavach-demo-runtime
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fdr-kavach-demo-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: fdr-kavach-demo-redis
+          type: keyvalue
+          property: connectionString
 
   - type: worker
     name: fdr-kavach-demo-beat
@@ -34,9 +59,18 @@ services:
     plan: 0.5c-512mb
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    startCommand: celery -A config beat --loglevel=INFO
+    dockerCommand: celery -A config beat --loglevel=INFO
     envVars:
       - fromGroup: fdr-kavach-demo-runtime
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fdr-kavach-demo-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: fdr-kavach-demo-redis
+          type: keyvalue
+          property: connectionString
 
   - type: keyvalue
     name: fdr-kavach-demo-redis
@@ -64,27 +98,12 @@ envVarGroups:
         generateValue: true
       - key: DOCUMENT_ENCRYPTION_KEY
         generateValue: true
-      - key: DATABASE_URL
-        fromDatabase:
-          name: fdr-kavach-demo-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: fdr-kavach-demo-redis
-          type: keyvalue
-          property: connectionString
-      - key: DJANGO_ALLOWED_HOSTS
-        value: localhost,127.0.0.1,api
       - key: DJANGO_DEBUG
         value: "0"
       - key: DEMO_MODE
         value: "true"
       - key: DEMO_SEED_ENABLED
         value: "1"
-      - key: DJANGO_CSRF_TRUSTED_ORIGINS
-        sync: false
-      - key: FRONTEND_ORIGIN
-        sync: false
       - key: SESSION_COOKIE_SECURE
         value: "1"
       - key: CSRF_COOKIE_SECURE

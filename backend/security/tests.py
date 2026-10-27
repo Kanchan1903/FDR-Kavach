@@ -6,6 +6,8 @@ import pymupdf
 import pyotp
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -37,6 +39,11 @@ class SecurityTests(TestCase):
         cache.clear()
         self.client = APIClient(enforce_csrf_checks=True)
         self.csrf = self.client.get("/api/csrf/").data["csrfToken"]
+
+    def test_health_endpoint_is_public_and_reports_ready(self):
+        response = self.client.get("/healthz/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
 
     def login(self, username, password):
         return self.client.post(
@@ -85,7 +92,7 @@ class SecurityTests(TestCase):
         self.assertTrue(identity.data["mfa_required"])
         self.assertTrue(identity.data["mfa_enabled"])
 
-    @override_settings(DEBUG=True, DEMO_MODE=True)
+    @override_settings(DEBUG=False, DEMO_MODE=True)
     def test_demo_totp_autofill_requires_a_successful_password_challenge(self):
         secret = pyotp.random_base32()
         user = User.objects.create_user(
@@ -105,7 +112,7 @@ class SecurityTests(TestCase):
         self.assertTrue(pyotp.TOTP(secret).verify(response.data["code"], valid_window=0))
         self.assertNotIn("secret", response.data)
 
-    @override_settings(DEBUG=True, DEMO_MODE=True)
+    @override_settings(DEBUG=False, DEMO_MODE=True)
     def test_demo_totp_autofill_supports_staff_enrollment_challenge(self):
         secret = pyotp.random_base32()
         user = User.objects.create_user(
@@ -175,6 +182,16 @@ class SecurityTests(TestCase):
         user = User.objects.create_user(username="institution2", password=TEST_PASSWORD, role="INSTITUTION_USER")
         self.login(user.username, TEST_PASSWORD)
         self.assertEqual(self.client.get("/api/audit/verify/").status_code, 403)
+
+    def test_public_demo_seed_is_allowed_without_debug_only_when_explicitly_enabled(self):
+        with override_settings(DEBUG=False, DEMO_MODE=True, DEMO_SEED_ENABLED=False):
+            with self.assertRaises(CommandError):
+                call_command("seed_demo", verbosity=0)
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(DEBUG=False, DEMO_MODE=True, DEMO_SEED_ENABLED=True, MEDIA_ROOT=media_root):
+                call_command("seed_demo", verbosity=0)
+        self.assertEqual(Institution.objects.filter(code__startswith="DEMO-").count(), 3)
+        self.assertEqual(FDR.objects.filter(fdr_number__startswith="DEMO-FDR-").count(), 30)
 
 
 @override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})

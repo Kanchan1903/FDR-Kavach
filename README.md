@@ -52,6 +52,30 @@ When running Django directly for UI work with `DJANGO_DEBUG=1`, login throttling
 
 Use `make down` to stop the local stack. Persistent PostgreSQL and encrypted file volumes remain until deliberately removed.
 
+## Deploy the SIH mentor demo (Vercel + Render)
+
+The checked-in `render.yaml` provisions the Django API, Celery worker, Celery Beat scheduler, private Render Key Value, PostgreSQL, and a persistent encrypted-document volume in Singapore. The API runs with `DJANGO_DEBUG=0`, HTTPS-only cookies, proxy-aware HTTPS detection, strong generated application/encryption keys, and a health endpoint. Its first successful deploy seeds only the clearly labelled synthetic demo dataset. Django's built-in admin URL is disabled in this public demo configuration.
+
+This is a public demo deployment. Demo usernames and their shared password are intentionally visible when the frontend demo flag is enabled, and the demo TOTP helper is enabled only after a seeded demo account enters its login challenge. Never upload real FDRs, beneficiary information, bank statements, or institution credentials to it.
+
+Render's web/worker services, Postgres, Key Value, and document disk in this blueprint use paid persistent plans. Render's free web services have ephemeral filesystems, free Postgres expires after 30 days, and free Key Value has no persistence; the worker services also need paid compute. Do not change this blueprint to free plans if you need a durable mentor demo or uploaded evidence to survive restarts. Review the current [Render free-instance limits](https://render.com/docs/free), [persistent disk requirements](https://render.com/docs/disks), and [Key Value persistence options](https://render.com/docs/key-value) before creating resources.
+
+1. In Render, create a Blueprint from `Kanchan1903/FDR-Kavach` on branch `main` and use the repository's `render.yaml`. Keep all services and datastores in the Singapore region. For the two frontend-origin prompts, enter the exact HTTPS Vercel production domain you plan to use, for example `https://fdr-kavach-demo.vercel.app`. Render generates the encryption and Django keys; do not replace them with the values from `.env.example`.
+2. Wait for the API's first successful deploy and initial demo seed. Check `https://<render-api-host>/healthz/` returns `{"status":"ok"}`. Record the actual Render API URL; it may differ from the service name if that subdomain is already taken.
+3. In Vercel, import the same GitHub repository, set **Root Directory** to `frontend`, and keep the Next.js framework and default build command. Add these Production environment variables before deployment:
+
+   ```text
+   NEXT_PUBLIC_API_URL=/backend
+   NEXT_PUBLIC_DEMO_MODE=true
+   RENDER_API_ORIGIN=https://<actual-render-api-host>
+   ```
+
+   `RENDER_API_ORIGIN` is server-side build configuration and must be the HTTPS Render API origin with no trailing slash. The Next.js rewrite proxies `/backend/api/*` to Render so session and CSRF cookies remain same-origin in the browser.
+4. Deploy Vercel. Copy its canonical production URL, then verify the Render Blueprint group's `FRONTEND_ORIGIN` and `DJANGO_CSRF_TRUSTED_ORIGINS` exactly match that URL (both are comma-separated lists if you add a custom domain). Redeploy the Render API after changing them. Add a custom domain only after both variables are updated to include it.
+5. Open the Vercel URL, use the login page's Demo Mode selector, then verify one institution account and one staff account including the TOTP helper. Confirm the demo banner is visible and the API and page work after a Render restart. Do not set `DJANGO_DEBUG=1` on Render.
+
+For a private, non-demo deployment, remove the public demo seed hook, set `DEMO_MODE=false` and `NEXT_PUBLIC_DEMO_MODE=false`, provision an administrator through a controlled Render shell/one-off job, and review `SECURITY.md` and provider access policies before entering any real information. This repository is a hackathon prototype, not an official AICTE service or a compliance approval.
+
 ## Demo walkthrough
 
 1. Start with `make dev`, then in another terminal run `make seed`. Sign in as `demo-demo-001` to exercise institution-scoped FDR access; use the printed `demo-senior`, `demo-reviewer`, and `demo-approver` credentials for separate staff actions.

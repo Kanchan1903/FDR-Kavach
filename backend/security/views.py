@@ -163,14 +163,14 @@ class MeView(APIView):
 
 
 class DemoTotpCodeView(APIView):
-    """Expose a live TOTP only for seeded accounts in the local demo environment."""
+    """Expose live TOTP only for a challenged, seeded demo account when demo mode is enabled."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
     throttle_scope = "login"
 
     def get(self, request):
-        if not settings.DEBUG or not settings.DEMO_MODE:
+        if not settings.DEMO_MODE:
             return Response({"detail": "Not found."}, status=404)
         username = request.query_params.get("username", "")
         if username not in DEMO_USERNAMES:

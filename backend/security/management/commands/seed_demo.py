@@ -30,8 +30,8 @@ class Command(BaseCommand):
     help = "Create a deterministic, development-only FDR Kavach demo dataset and demo credentials."
 
     def handle(self, *args, **options):
-        if not settings.DEBUG or not settings.DEMO_MODE:
-            raise CommandError("Demo seeding requires both DJANGO_DEBUG=1 and DEMO_MODE=true.")
+        if not settings.DEMO_MODE or not (settings.DEBUG or settings.DEMO_SEED_ENABLED):
+            raise CommandError("Demo seeding requires DEMO_MODE=true and either DJANGO_DEBUG=1 or DEMO_SEED_ENABLED=1.")
         def ensure_user(username, role, institution=None):
             user, created = User.objects.get_or_create(
                 username=username,

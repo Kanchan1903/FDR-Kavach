@@ -8,9 +8,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 DEMO_MODE = os.environ.get("DEMO_MODE", "false").lower() == "true"
-if not SECRET_KEY or (not DEBUG and (SECRET_KEY.startswith("replace-with-") or len(SECRET_KEY) < 50)):
-    raise ImproperlyConfigured("Set a unique DJANGO_SECRET_KEY of at least 50 characters for production.")
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,api").split(",")
+if not SECRET_KEY or (not DEBUG and (SECRET_KEY.startswith("replace-with-") or len(SECRET_KEY) < 43)):
+    raise ImproperlyConfigured("Set a unique DJANGO_SECRET_KEY with at least 256 bits of entropy for production.")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,api").split(",")
+    if host.strip()
+]
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -79,13 +85,22 @@ SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SECURE = os.environ.get("CSRF_COOKIE_SECURE", "0") == "1"
-CSRF_TRUSTED_ORIGINS = os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",")
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "0") == "1"
-CORS_ALLOWED_ORIGINS = [os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000")]
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("FRONTEND_ORIGIN", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["security.authentication.SessionCsrfAuthentication"],
@@ -97,12 +112,11 @@ REST_FRAMEWORK = {
 LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
 LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))
 INSTITUTION_MFA_REQUIRED = os.environ.get("INSTITUTION_MFA_REQUIRED", "0") == "1"
+DEMO_SEED_ENABLED = os.environ.get("DEMO_SEED_ENABLED", "0") == "1"
 TOTP_ISSUER = os.environ.get("TOTP_ISSUER", "FDR Kavach")
 MFA_ENCRYPTION_KEY = os.environ.get("MFA_ENCRYPTION_KEY", "")
 DOCUMENT_ENCRYPTION_KEY = os.environ.get("DOCUMENT_ENCRYPTION_KEY", "")
 if not DEBUG:
-    if DEMO_MODE:
-        raise ImproperlyConfigured("DEMO_MODE must be disabled outside development.")
     if not MFA_ENCRYPTION_KEY or MFA_ENCRYPTION_KEY.startswith("replace-with-"):
         raise ImproperlyConfigured("Set MFA_ENCRYPTION_KEY to a stable secret in production.")
     if not DOCUMENT_ENCRYPTION_KEY or DOCUMENT_ENCRYPTION_KEY.startswith("replace-with-"):

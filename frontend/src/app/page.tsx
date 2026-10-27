@@ -11,7 +11,7 @@ import Phase45Console from "@/components/Phase45Console";
 import RuleSets from "@/components/RuleSets";
 import AccessControls from "@/components/AccessControls";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const api = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "/backend" : "http://localhost:8000");
 const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 const demoPassword = demoMode ? "DemoKavach2026!" : "";
 const demoProfiles = [

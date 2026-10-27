@@ -40,4 +40,6 @@ The browser, institution users, uploaded files, and imported bank CSVs are untru
 
 ## Demo data
 
-`make seed` runs only when both `DJANGO_DEBUG=1` and `DEMO_MODE=true`. It creates synthetic institutions, users, FDRs and deliberately mismatched bank CSV results. It prints generated passwords only when it creates demo accounts. Do not enable demo mode or use demo credentials in a shared or production environment.
+Locally, `make seed` requires `DJANGO_DEBUG=1` and `DEMO_MODE=true`. The Render Blueprint is a separate public mentor-demo deployment: it keeps `DEBUG=0`, opts into `DEMO_MODE=true`, and enables the seed command explicitly with `DEMO_SEED_ENABLED=1`. The command is idempotent and creates only synthetic institutions, users, FDRs, a demo rule, and deliberately mismatched bank CSV results. Django admin is not routed in this public demo mode. Demo credentials and the challenged-account TOTP helper are intentionally public there.
+
+Treat that deployment as a disposable demonstration environment. Do not enter or import real FDRs, bank data, account details, institution credentials, or personal information. Do not reuse demo passwords. A non-demo deployment must use `DEMO_MODE=false`, `DEMO_SEED_ENABLED=0`, and `NEXT_PUBLIC_DEMO_MODE=false`, and must provision its real users through a controlled administrative process. Enabling `DEMO_MODE` alongside real records would expose the seeded demo accounts and demo MFA helper to anyone who can reach the site.

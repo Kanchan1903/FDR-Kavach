@@ -2,7 +2,6 @@ import hashlib
 from datetime import date, timedelta
 from decimal import Decimal
 
-import pyotp
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
@@ -10,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from security.audit import record_event
+from security.demo_accounts import ensure_demo_accounts
 from security.models import (
     FDR,
     BankBatch,
@@ -17,65 +17,26 @@ from security.models import (
     CoverageRuleSet,
     FDREvidence,
     FDRVersion,
-    Institution,
-    User,
 )
 from security.reconciliation import BankSimulator, process_bank_batch
 from security.record_services import set_evidence, snapshot_fdr
 
-DEMO_PASSWORD = "DemoKavach2026!"
-
 
 class Command(BaseCommand):
-    help = "Create a deterministic, development-only FDR Kavach demo dataset and demo credentials."
+    help = "Create demo records and create missing demo accounts without changing existing users."
 
     def handle(self, *args, **options):
         if not settings.DEMO_MODE:
             raise CommandError("Demo seeding requires DEMO_MODE=true.")
-        def ensure_user(username, role, institution=None):
-            user, created = User.objects.get_or_create(
-                username=username,
-                defaults={"role": role, "institution": institution, "is_staff": role == User.Role.ADMIN},
+        institutions_by_code, users, created_users, conflicts = ensure_demo_accounts()
+        if conflicts:
+            raise CommandError(
+                "Existing demo usernames have role or institution conflicts; no existing users were changed."
             )
-            if not created and (user.role != role or user.institution_id != getattr(institution, "id", None)):
-                raise CommandError(f"Existing demo user {username!r} has a different role or institution.")
-            user.set_password(DEMO_PASSWORD)
-            if not user.totp_secret:
-                user.totp_secret = pyotp.random_base32()
-            user.totp_enabled = True
-            # Demo accounts can be intentionally reused in public presentations.
-            # Clear a prior demo lockout whenever the demo seed is re-applied.
-            user.failed_login_attempts = 0
-            user.locked_until = None
-            user.save(
-                update_fields=[
-                    "password",
-                    "totp_secret",
-                    "totp_enabled",
-                    "failed_login_attempts",
-                    "locked_until",
-                ]
-            )
-            return user
-
-        institutions = []
-        for code, name in [
-            ("DEMO-001", "Demo Institute North"),
-            ("DEMO-002", "Demo Institute Central"),
-            ("DEMO-003", "Demo Institute South"),
-        ]:
-            institution, _ = Institution.objects.get_or_create(code=code, defaults={"name": name})
-            institutions.append(institution)
-
-        institution_users = [
-            ensure_user(f"demo-{institution.code.lower()}", User.Role.INSTITUTION_USER, institution)
-            for institution in institutions
-        ]
-        senior = ensure_user("demo-senior", User.Role.SENIOR_OFFICER)
-        admin = ensure_user("demo-admin", User.Role.ADMIN)
-        ensure_user("demo-reviewer", User.Role.REVIEWER)
-        ensure_user("demo-approver", User.Role.APPROVER)
-        ensure_user("demo-auditor", User.Role.AUDITOR)
+        institutions = [institutions_by_code[code] for code in ("DEMO-001", "DEMO-002", "DEMO-003")]
+        institution_users = [users[f"demo-{institution.code.lower()}"] for institution in institutions]
+        senior = users["demo-senior"]
+        admin = users["demo-admin"]
 
         with transaction.atomic():
             rule = CoverageRuleSet.objects.filter(name="DEMO RULE - illustrative only").first()
@@ -171,4 +132,4 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(f"Seeded {len(institutions)} institutions, {len(fdrs)} FDR records, and a bank batch.")
         )
-        self.stdout.write("Demo accounts use the public demo password shown on the website sign-in page.")
+        self.stdout.write(f"Created {created_users} missing demo accounts; existing accounts were left unchanged.")

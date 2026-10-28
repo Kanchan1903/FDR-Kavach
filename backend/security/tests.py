@@ -43,7 +43,9 @@ class SecurityTests(TestCase):
     def test_health_endpoint_is_public_and_reports_ready(self):
         response = self.client.get("/healthz/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok"})
+        self.assertEqual(response.json()["status"], "ok")
+        self.assertIn("demo_mode", response.json())
+        self.assertIn("demo_accounts_ready", response.json())
 
     def login(self, username, password):
         return self.client.post(
@@ -67,6 +69,31 @@ class SecurityTests(TestCase):
         self.csrf = self.client.get("/api/csrf/").data["csrfToken"]
         logout = self.client.post("/api/auth/logout/", {}, format="json", HTTP_X_CSRFTOKEN=self.csrf)
         self.assertEqual(logout.status_code, 200)
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+
+    def test_login_rejects_incorrect_password_without_authenticating(self):
+        User.objects.create_user(username="wrong-password-user", password=TEST_PASSWORD)
+
+        response = self.login("wrong-password-user", "not-the-password")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["detail"], "Invalid credentials or account temporarily unavailable.")
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+
+    def test_login_rejects_missing_account_with_generic_error(self):
+        response = self.login("no-such-account", TEST_PASSWORD)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["detail"], "Invalid credentials or account temporarily unavailable.")
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
+
+    def test_login_rejects_inactive_account(self):
+        User.objects.create_user(username="inactive-user", password=TEST_PASSWORD, is_active=False)
+
+        response = self.login("inactive-user", TEST_PASSWORD)
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["detail"], "Invalid credentials or account temporarily unavailable.")
         self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)
 
     def test_staff_requires_mfa_and_session_rotation(self):
@@ -183,15 +210,40 @@ class SecurityTests(TestCase):
         self.login(user.username, TEST_PASSWORD)
         self.assertEqual(self.client.get("/api/audit/verify/").status_code, 403)
 
-    def test_public_demo_seed_is_allowed_without_debug_only_when_explicitly_enabled(self):
-        with override_settings(DEBUG=False, DEMO_MODE=True, DEMO_SEED_ENABLED=False):
+    def test_demo_seed_requires_demo_mode_and_never_overwrites_existing_users(self):
+        with override_settings(DEBUG=False, DEMO_MODE=False):
             with self.assertRaises(CommandError):
                 call_command("seed_demo", verbosity=0)
         with tempfile.TemporaryDirectory() as media_root:
-            with override_settings(DEBUG=False, DEMO_MODE=True, DEMO_SEED_ENABLED=True, MEDIA_ROOT=media_root):
+            with override_settings(DEBUG=False, DEMO_MODE=True, DEMO_SEED_ENABLED=False, MEDIA_ROOT=media_root):
                 call_command("seed_demo", verbosity=0)
         self.assertEqual(Institution.objects.filter(code__startswith="DEMO-").count(), 3)
         self.assertEqual(FDR.objects.filter(fdr_number__startswith="DEMO-FDR-").count(), 30)
+        self.assertEqual(User.objects.filter(username__startswith="demo-").count(), 8)
+
+        existing = User.objects.get(username="demo-demo-001")
+        existing.set_password(TEST_PASSWORD)
+        existing.failed_login_attempts = 3
+        expected_locked_until = timezone.now() + timedelta(minutes=10)
+        existing.locked_until = expected_locked_until
+        existing.is_active = False
+        original_secret = existing.totp_secret
+        original_role = existing.role
+        original_institution_id = existing.institution_id
+        existing.save(update_fields=["password", "failed_login_attempts", "locked_until", "is_active"])
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            DEBUG=False, DEMO_MODE=True, MEDIA_ROOT=media_root
+        ):
+            call_command("seed_demo", verbosity=0)
+
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password(TEST_PASSWORD))
+        self.assertEqual(existing.failed_login_attempts, 3)
+        self.assertEqual(existing.locked_until, expected_locked_until)
+        self.assertEqual(existing.totp_secret, original_secret)
+        self.assertFalse(existing.is_active)
+        self.assertEqual(existing.role, original_role)
+        self.assertEqual(existing.institution_id, original_institution_id)
 
 
 @override_settings(CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}})

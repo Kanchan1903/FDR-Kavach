@@ -63,8 +63,14 @@ const navigationGroups: Array<{ label: string; items: Array<{ key: PageKey; role
 
 async function getCsrf() {
   const response = await fetch(`${api}/api/csrf/`, { credentials: "include" });
-  if (!response.ok) throw new Error("Could not initialize the secure session.");
-  return (await response.json()).csrfToken as string;
+  if (!response.ok) {
+    throw new Error(`Secure session request failed (HTTP ${response.status}). The latest frontend build must use the /backend API proxy.`);
+  }
+  const payload = await response.json();
+  if (typeof payload.csrfToken !== "string" || !payload.csrfToken) {
+    throw new Error("Secure session response did not include a CSRF token. Check the API connection.");
+  }
+  return payload.csrfToken as string;
 }
 
 export default function Home() {

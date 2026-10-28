@@ -5,4 +5,4 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
-CMD ["sh", "-c", "python manage.py migrate --noinput && if [ \"$DEMO_SEED_ENABLED\" = \"1\" ]; then python manage.py seed_demo; fi && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 120 --access-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && if [ \"$DEMO_MODE\" = \"true\" ]; then python manage.py seed_demo; fi && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 2 --timeout 120 --access-logfile -"]

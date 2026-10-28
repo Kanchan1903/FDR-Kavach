@@ -9,7 +9,7 @@ services:
     healthCheckPath: /healthz/
     preDeployCommand: python manage.py migrate --noinput
     dockerCommand: >-
-      sh -c 'python manage.py seed_demo && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 --access-logfile -'
+      sh -c 'exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 120 --access-logfile -'
     disk:
       name: fdr-kavach-demo-documents
       mountPath: /app/media

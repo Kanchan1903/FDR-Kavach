@@ -52,46 +52,7 @@ When running Django directly for UI work with `DJANGO_DEBUG=1`, login throttling
 
 Use `make down` to stop the local stack. Persistent PostgreSQL and encrypted file volumes remain until deliberately removed.
 
-## Free mentor-demo backend (Koyeb + Neon + Upstash)
-
-This option keeps the Django API on Koyeb's single free web instance, uses Neon for PostgreSQL, and Upstash for Redis. It is a synthetic-data demonstration deployment, not production hosting. Koyeb's free instance has 512 MB RAM and 0.1 vCPU, sleeps after one idle hour, and cannot run separate worker services or persistent volumes. Therefore Celery reminders/escalations are not processed, and encrypted uploaded files on the local filesystem can disappear after an instance replacement. Do not upload real FDRs or bank data. [Koyeb free-instance limits](https://www.koyeb.com/docs/reference/instances)
-
-1. Create a PostgreSQL project in [Neon](https://console.neon.tech/). Copy its connection string as `DATABASE_URL` and ensure it includes `sslmode=require`.
-2. Create a Redis database in [Upstash](https://console.upstash.com/). Copy the TLS connection string (`rediss://...`) as `REDIS_URL`. The free Redis plan currently includes 256 MB and 500,000 commands per month. [Upstash pricing](https://upstash.com/pricing/redis)
-3. In [Koyeb](https://app.koyeb.com/), create a Web Service from GitHub. Choose `Kanchan1903/FDR-Kavach`, branch `main`, Dockerfile builder, work directory `backend`, Dockerfile path `Dockerfile`, and the Free instance. Expose port `8000` as HTTP and route `/:8000`. The Dockerfile command runs migrations, seeds only when `DEMO_SEED_ENABLED=1`, and starts Gunicorn.
-4. Add the following Koyeb environment variables. Store the database URL, Redis URL, and keys as secrets. Generate three different long random values for the Django, MFA-encryption, and document-encryption keys. Set `DJANGO_ALLOWED_HOSTS` to `{{ KOYEB_PUBLIC_DOMAIN }}`.
-
-   ```text
-   DATABASE_URL=<Neon connection string with sslmode=require>
-   REDIS_URL=<Upstash rediss:// connection string>
-   DJANGO_SECRET_KEY=<unique random secret, at least 43 characters>
-   MFA_ENCRYPTION_KEY=<different stable random secret>
-   DOCUMENT_ENCRYPTION_KEY=<different stable random secret>
-   DJANGO_ALLOWED_HOSTS={{ KOYEB_PUBLIC_DOMAIN }}
-   DJANGO_DEBUG=0
-   DEMO_MODE=true
-   DEMO_SEED_ENABLED=1
-   FRONTEND_ORIGIN=https://<your-vercel-domain>
-   DJANGO_CSRF_TRUSTED_ORIGINS=https://<your-vercel-domain>
-   SESSION_COOKIE_SECURE=1
-   CSRF_COOKIE_SECURE=1
-   SECURE_SSL_REDIRECT=1
-   DJANGO_USE_REDIS_CACHE=1
-   LOGIN_MAX_ATTEMPTS=5
-   LOGIN_LOCKOUT_MINUTES=15
-   ```
-
-5. Deploy and check `https://<your-koyeb-domain>/healthz/` returns `{"status":"ok"}`. Then set these Vercel Production variables and redeploy:
-
-   ```text
-   NEXT_PUBLIC_API_URL=/backend
-   NEXT_PUBLIC_DEMO_MODE=true
-   BACKEND_API_ORIGIN=https://<your-koyeb-domain>
-   ```
-
-   The frontend proxies API traffic through the same origin so secure session and CSRF cookies work. After changing the Vercel URL, update `FRONTEND_ORIGIN` and `DJANGO_CSRF_TRUSTED_ORIGINS` in Koyeb and redeploy the API.
-
-## Persistent backend option (Vercel + Render)
+## Deploy the SIH mentor demo (Vercel + Render)
 
 The checked-in `render.yaml` provisions the Django API, Celery worker, Celery Beat scheduler, private Render Key Value, PostgreSQL, and a persistent encrypted-document volume in Singapore. The API runs with `DJANGO_DEBUG=0`, HTTPS-only cookies, proxy-aware HTTPS detection, strong generated application/encryption keys, and a health endpoint. Its first successful deploy seeds only the clearly labelled synthetic demo dataset. Django's built-in admin URL is disabled in this public demo configuration.
 

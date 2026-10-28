@@ -61,6 +61,16 @@ const navigationGroups: Array<{ label: string; items: Array<{ key: PageKey; role
   ] },
 ];
 
+async function readApiJson(response: Response, action: string) {
+  try {
+    const payload: unknown = await response.json();
+    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) throw new Error("Invalid API payload");
+    return payload as Record<string, any>;
+  } catch {
+    throw new Error(`${action} returned a non-JSON response (HTTP ${response.status}). Check the backend deployment.`);
+  }
+}
+
 async function getCsrf() {
   const response = await fetch(`${api}/api/csrf/`, { credentials: "include" });
   if (!response.ok) {
@@ -114,7 +124,7 @@ export default function Home() {
     try {
       const csrf = await getCsrf();
       const response = await fetch(`${api}/api/auth/login/`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf }, body: JSON.stringify({ username, password }) });
-      const payload = await response.json();
+      const payload = await readApiJson(response, "Sign in");
       if (!response.ok) throw new Error(payload.detail ?? "Sign in failed.");
       setPassword("");
       if (payload.mfa_enrollment_required) { setMfaMode("enroll"); setNotice("Set up an authenticator app to complete staff sign in."); }
@@ -127,7 +137,7 @@ export default function Home() {
   async function loadMfaEnrollment() {
     try {
       const response = await fetch(`${api}/api/auth/mfa/enroll/`, { credentials: "include" });
-      const payload = await response.json();
+      const payload = await readApiJson(response, "MFA enrollment");
       if (!response.ok) throw new Error(payload.detail ?? "Could not start MFA enrollment.");
       setSecret(payload.secret);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not start MFA enrollment."); }
@@ -138,7 +148,7 @@ export default function Home() {
     setDemoCodeLoading(true);
     try {
       const response = await fetch(`${api}/api/auth/demo-totp/?username=${encodeURIComponent(username)}`, { credentials: "include" });
-      const payload = await response.json();
+      const payload = await readApiJson(response, "Demo MFA code");
       if (!response.ok) throw new Error(payload.detail ?? "Demo authenticator code is unavailable. Use your authenticator app.");
       setCode(payload.code);
       setNotice(`Current demo authenticator code filled · valid for about ${payload.valid_for_seconds} seconds.`);
@@ -156,7 +166,7 @@ export default function Home() {
       const csrf = await getCsrf();
       const endpoint = mfaMode === "enroll" ? "enroll" : "verify";
       const response = await fetch(`${api}/api/auth/mfa/${endpoint}/`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf }, body: JSON.stringify({ code }) });
-      const payload = await response.json();
+      const payload = await readApiJson(response, "MFA verification");
       if (!response.ok) throw new Error(payload.detail ?? "MFA verification failed.");
       setCode(""); setSecret(null); setMfaMode(null); await refreshIdentity(); setNotice("Identity verified. You are signed in.");
     } catch (e) { setError(e instanceof Error ? e.message : "MFA verification failed."); }

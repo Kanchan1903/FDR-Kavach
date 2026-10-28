@@ -43,7 +43,19 @@ class Command(BaseCommand):
             if not user.totp_secret:
                 user.totp_secret = pyotp.random_base32()
             user.totp_enabled = True
-            user.save(update_fields=["password", "totp_secret", "totp_enabled"])
+            # Demo accounts can be intentionally reused in public presentations.
+            # Clear a prior demo lockout whenever the demo seed is re-applied.
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            user.save(
+                update_fields=[
+                    "password",
+                    "totp_secret",
+                    "totp_enabled",
+                    "failed_login_attempts",
+                    "locked_until",
+                ]
+            )
             return user
 
         institutions = []

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const api = process.env.NODE_ENV === "production" ? "/backend" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
 type Rule = {
   id: string;
   name: string;

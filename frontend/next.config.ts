@@ -20,7 +20,10 @@ const nextConfig: NextConfig = {
     // Allow the frontend to deploy before the API exists. Once the API is
     // deployed, set BACKEND_API_ORIGIN in Vercel and redeploy to enable proxying.
     return apiOrigin
-      ? [{ source: "/backend/api/:path*", destination: `${apiOrigin}/api/:path*` }]
+      // Next.js normalizes incoming paths without a trailing slash. Django's
+      // APPEND_SLASH redirect would then escape the /backend proxy, so restore
+      // the slash in the upstream path for Django's slash-terminated routes.
+      ? [{ source: "/backend/api/:path*", destination: `${apiOrigin}/api/:path*/` }]
       : [];
   },
 };

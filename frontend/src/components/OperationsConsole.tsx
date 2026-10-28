@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Phase45Console from "@/components/Phase45Console";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const api = process.env.NODE_ENV === "production" ? "/backend" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
 const staffRoles = ["REVIEWER", "APPROVER", "SENIOR_OFFICER", "ADMIN", "AUDITOR"];
 const canImport = (role: string) => ["SENIOR_OFFICER", "ADMIN"].includes(role);
 

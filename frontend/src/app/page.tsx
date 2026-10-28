@@ -11,7 +11,10 @@ import Phase45Console from "@/components/Phase45Console";
 import RuleSets from "@/components/RuleSets";
 import AccessControls from "@/components/AccessControls";
 
-const api = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "/backend" : "http://localhost:8000");
+// Production authentication relies on the same-origin proxy so the browser
+// can retain Django's secure session and CSRF cookies. Do not let a public
+// NEXT_PUBLIC_API_URL override bypass that proxy on Vercel.
+const api = process.env.NODE_ENV === "production" ? "/backend" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
 const demoMode = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 const demoPassword = demoMode ? "DemoKavach2026!" : "";
 const demoProfiles = [
